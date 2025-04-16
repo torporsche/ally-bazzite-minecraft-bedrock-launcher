@@ -2,9 +2,9 @@
 #include <QCommandLineParser>
 #include <QtWebEngineWidgets>
 #include <QGamepad>
-#include "launcher/LauncherWindow.hpp"
-#include "core/Config.hpp"
-#include "auth/GooglePlayAuth.hpp"
+#include "LauncherWindow.hpp"
+#include "Config.hpp"
+#include "GooglePlayAuth.hpp"
 
 int main(int argc, char *argv[]) {
     // Enable Wayland support
