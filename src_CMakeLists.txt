@@ -1,0 +1,57 @@
+set(SOURCES
+    main.cpp
+    auth/GooglePlayAPI.cpp
+    auth/GooglePlayAuth.cpp
+    game/GameManager.cpp
+    gamepad/AllyGamepad.cpp
+    gamepad/AllySystemControl.cpp
+    steam/SteamBPMIntegration.cpp
+    steam/SteamIntegration.cpp
+    ui/LauncherWindow.cpp
+    ui/SettingsDialog.cpp
+    ui/VersionInstallDialog.cpp
+)
+
+set(HEADERS
+    auth/GooglePlayAPI.hpp
+    auth/GooglePlayAuth.hpp
+    game/GameManager.hpp
+    gamepad/AllyGamepad.hpp
+    gamepad/AllySystemControl.hpp
+    steam/SteamBPMIntegration.hpp
+    steam/SteamIntegration.hpp
+    ui/LauncherWindow.hpp
+    ui/SettingsDialog.hpp
+    ui/VersionInstallDialog.hpp
+)
+
+# Create executable
+add_executable(ally-mc-launcher ${SOURCES} ${HEADERS})
+
+# Link libraries
+target_link_libraries(ally-mc-launcher PRIVATE
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Network
+    Qt6::WebEngineWidgets
+    Qt6::Gamepad
+    SDL3::SDL3
+    Wayland::Server
+    EGL::EGL
+    OpenGL::GL
+)
+
+# Install configuration
+install(TARGETS ally-mc-launcher
+    RUNTIME DESTINATION bin
+)
+
+install(FILES ${CMAKE_SOURCE_DIR}/resources/icons/app.png
+    DESTINATION share/icons/hicolor/256x256/apps
+    RENAME ally-mc-launcher.png
+)
+
+install(FILES ${CMAKE_SOURCE_DIR}/resources/ally-mc-launcher.desktop
+    DESTINATION share/applications
+)
