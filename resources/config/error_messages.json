@@ -1,0 +1,23 @@
+{
+    "hardware": {
+        "tdp_access": "Unable to access TDP controls. Please check permissions.",
+        "gpu_access": "Unable to access GPU controls. Please check permissions.",
+        "fan_access": "Unable to access fan controls. Please check permissions.",
+        "temp_access": "Unable to read temperature sensors."
+    },
+    "steam": {
+        "init_failed": "Steam initialization failed. Running in standalone mode.",
+        "api_error": "Steam API error: {0}",
+        "config_load": "Failed to load Steam controller configuration."
+    },
+    "game": {
+        "launch_failed": "Failed to launch game: {0}",
+        "save_error": "Failed to save game data: {0}",
+        "update_error": "Game update failed: {0}"
+    },
+    "system": {
+        "permission_denied": "Permission denied. Please run setup_rog_ally.sh",
+        "driver_error": "Required driver not loaded: {0}",
+        "config_error": "Configuration error: {0}"
+    }
+}

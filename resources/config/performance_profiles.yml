@@ -1,0 +1,40 @@
+profiles:
+  silent:
+    name: "Battery Saver"
+    description: "Optimized for battery life"
+    tdp: 10
+    gpu_freq: 1200
+    cpu_boost: false
+    fan_mode: "silent"
+    screen_refresh: 40
+    resolution_scale: 0.75
+
+  balanced:
+    name: "Balanced"
+    description: "Default balanced profile"
+    tdp: 15
+    gpu_freq: 1600
+    cpu_boost: true
+    fan_mode: "dynamic"
+    screen_refresh: 60
+    resolution_scale: 1.0
+
+  turbo:
+    name: "Performance"
+    description: "Maximum performance"
+    tdp: 25
+    gpu_freq: 2000
+    cpu_boost: true
+    fan_mode: "performance"
+    screen_refresh: 90
+    resolution_scale: 1.0
+
+  custom:
+    name: "Custom"
+    description: "User-defined settings"
+    tdp: 15
+    gpu_freq: 1600
+    cpu_boost: true
+    fan_mode: "custom"
+    screen_refresh: 60
+    resolution_scale: 1.0

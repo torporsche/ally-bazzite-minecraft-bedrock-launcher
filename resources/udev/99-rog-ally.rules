@@ -1,0 +1,6 @@
+# ROG Ally hardware access rules
+ACTION=="add", SUBSYSTEM=="power_supply", ATTR{name}=="BAT1", MODE="0666"
+ACTION=="add", SUBSYSTEM=="hwmon", ATTR{name}=="asus_nb_wmi", MODE="0666"
+ACTION=="add", SUBSYSTEM=="powercap", ATTR{name}=="powercap0", MODE="0666"
+ACTION=="add", SUBSYSTEM=="drm", ATTR{name}=="card0", MODE="0666"
+ACTION=="add", SUBSYSTEM=="input", ATTRS{name}=="Asus Gamepad", MODE="0666"

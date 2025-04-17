@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ally MC Launcher
+GenericName=Minecraft Bedrock Launcher
+Comment=Minecraft Bedrock Launcher optimized for ROG Ally
+Exec=ally-mc-launcher
+Icon=ally-mc-launcher
+Terminal=false
+Categories=Game;
+Keywords=minecraft;bedrock;rog;ally;game;
+StartupWMClass=ally-mc-launcher

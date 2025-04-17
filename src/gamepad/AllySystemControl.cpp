@@ -1,7 +1,15 @@
 #include "AllySystemControl.hpp"
 #include <QFile>
-#include <QDir>
 #include <QDebug>
+#include <QProcess>
+
+// System file paths for ROG Ally
+const QString AllySystemControl::POWER_PROFILE_PATH = "/sys/devices/platform/asus-nb-wmi/profile";
+const QString AllySystemControl::TDP_PATH = "/sys/class/powercap/powercap0/tdp";
+const QString AllySystemControl::GPU_FREQ_PATH = "/sys/class/drm/card0/device/pp_dpm_sclk";
+const QString AllySystemControl::TEMP_PATH = "/sys/class/hwmon/hwmon*/temp1_input";
+const QString AllySystemControl::FAN_PATH = "/sys/devices/platform/asus-nb-wmi/fan_speed";
+const QString AllySystemControl::BATTERY_PATH = "/sys/class/power_supply/BAT1/";
 
 AllySystemControl* AllySystemControl::s_instance = nullptr;
 
@@ -14,51 +22,151 @@ AllySystemControl* AllySystemControl::instance() {
 
 AllySystemControl::AllySystemControl(QObject* parent)
     : QObject(parent)
-    , m_vrrSupported(false)
-    , m_vrrEnabled(false)
-    , m_currentRefreshRate(60)
-    , m_currentMode(PerformanceMode::BALANCED)
+    , m_currentProfile(PerformanceProfile::BALANCED)
     , m_currentTDP(15)
-    , m_currentFanSpeed(50)
-    , m_vrrSysfsPath("/sys/class/drm/card0/device/vrr_enabled")
-    , m_perfModePath("/sys/devices/platform/asus-nb-wmi/performance_mode")
-    , m_tdpPath("/sys/devices/platform/asus-nb-wmi/power_boost")
-    , m_fanPath("/sys/devices/platform/asus-nb-wmi/fan_boost_mode") {
-
-    initializeVRRControl();
-    initializePerformanceControl();
+    , m_currentGPUFreq(1600)
+    , m_freeSyncEnabled(true)
+    , m_currentTemp(0.0f)
+    , m_batteryLevel(100)
+    , m_isCharging(false)
+    , m_fanSpeed(0) {
+    
+    // Set up monitoring timer
+    connect(&m_monitorTimer, &QTimer::timeout, this, [this]() {
+        monitorTemperature();
+        monitorBattery();
+        adjustFanCurve();
+    });
+    m_monitorTimer.start(2000); // Check every 2 seconds
 }
 
-AllySystemControl::~AllySystemControl() {
-}
+bool AllySystemControl::setPerformanceProfile(PerformanceProfile profile) {
+    QString profileValue;
+    switch (profile) {
+        case PerformanceProfile::SILENT:
+            profileValue = "0";
+            setTDP(10);  // Lower TDP for battery savings
+            break;
+        case PerformanceProfile::BALANCED:
+            profileValue = "1";
+            setTDP(15);  // Default TDP
+            break;
+        case PerformanceProfile::TURBO:
+            profileValue = "2";
+            setTDP(25);  // Higher TDP for maximum performance
+            break;
+        case PerformanceProfile::MANUAL:
+            profileValue = "3";
+            // Keep current TDP
+            break;
+    }
 
-bool AllySystemControl::initializeVRRControl() {
-    // Check if VRR is supported
-    if (QFile::exists(m_vrrSysfsPath)) {
-        m_vrrSupported = true;
-        m_vrrEnabled = (readFromSysfs(m_vrrSysfsPath) == "1");
+    if (writeToSysfs(POWER_PROFILE_PATH, profileValue)) {
+        m_currentProfile = profile;
+        emit performanceProfileChanged(profile);
         return true;
     }
     return false;
 }
 
-bool AllySystemControl::initializePerformanceControl() {
-    if (!QFile::exists(m_perfModePath)) {
-        qWarning() << "Performance control not available";
+bool AllySystemControl::setTDP(int watts) {
+    if (watts < 5 || watts > 30) {
+        qWarning() << "TDP value out of range (5-30W):" << watts;
         return false;
     }
 
-    // Read current performance mode
-    QString mode = readFromSysfs(m_perfModePath);
-    if (mode == "0") m_currentMode = PerformanceMode::SILENT;
-    else if (mode == "1") m_currentMode = PerformanceMode::BALANCED;
-    else if (mode == "2") m_currentMode = PerformanceMode::TURBO;
+    if (writeToSysfs(TDP_PATH, QString::number(watts * 1000000))) {
+        m_currentTDP = watts;
+        emit tdpChanged(watts);
+        return true;
+    }
+    return false;
+}
+
+bool AllySystemControl::setGPUFreq(int mhz) {
+    QString freqStr = QString::number(mhz);
+    if (writeToSysfs(GPU_FREQ_PATH, freqStr)) {
+        m_currentGPUFreq = mhz;
+        emit gpuFreqChanged(mhz);
+        return true;
+    }
+    return false;
+}
+
+bool AllySystemControl::enableFreeSync(bool enabled) {
+    QProcess process;
+    process.start("gamescope", QStringList() 
+        << "--force-adaptive-sync" 
+        << (enabled ? "1" : "0"));
     
-    // Read current TDP and fan speed
-    m_currentTDP = readFromSysfs(m_tdpPath).toInt();
-    m_currentFanSpeed = readFromSysfs(m_fanPath).toInt();
+    if (process.waitForFinished()) {
+        m_freeSyncEnabled = enabled;
+        emit freeSyncStatusChanged(enabled);
+        return true;
+    }
+    return false;
+}
+
+void AllySystemControl::monitorTemperature() {
+    QString temp = readFromSysfs(TEMP_PATH);
+    if (!temp.isEmpty()) {
+        float tempValue = temp.toFloat() / 1000.0f; // Convert from millidegrees to degrees
+        if (tempValue != m_currentTemp) {
+            m_currentTemp = tempValue;
+            emit temperatureChanged(tempValue);
+        }
+    }
+}
+
+void AllySystemControl::monitorBattery() {
+    QString capacityStr = readFromSysfs(BATTERY_PATH + "capacity");
+    QString statusStr = readFromSysfs(BATTERY_PATH + "status");
     
-    return true;
+    if (!capacityStr.isEmpty()) {
+        int level = capacityStr.toInt();
+        if (level != m_batteryLevel) {
+            m_batteryLevel = level;
+            emit batteryLevelChanged(level);
+        }
+    }
+    
+    bool charging = (statusStr.contains("Charging"));
+    if (charging != m_isCharging) {
+        m_isCharging = charging;
+        emit chargingStateChanged(charging);
+    }
+}
+
+void AllySystemControl::adjustFanCurve() {
+    // Implement dynamic fan curve based on temperature
+    int targetSpeed;
+    
+    if (m_currentTemp >= 80.0f) {
+        targetSpeed = 100;
+    } else if (m_currentTemp >= 70.0f) {
+        targetSpeed = 80;
+    } else if (m_currentTemp >= 60.0f) {
+        targetSpeed = 60;
+    } else if (m_currentTemp >= 50.0f) {
+        targetSpeed = 40;
+    } else {
+        targetSpeed = 20;
+    }
+    
+    setFanSpeed(targetSpeed);
+}
+
+bool AllySystemControl::setFanSpeed(int percentage) {
+    if (percentage < 0 || percentage > 100) {
+        return false;
+    }
+    
+    if (writeToSysfs(FAN_PATH, QString::number(percentage))) {
+        m_fanSpeed = percentage;
+        emit fanSpeedChanged(percentage);
+        return true;
+    }
+    return false;
 }
 
 bool AllySystemControl::writeToSysfs(const QString& path, const QString& value) {
@@ -73,6 +181,7 @@ bool AllySystemControl::writeToSysfs(const QString& path, const QString& value) 
         return false;
     }
     
+    file.close();
     return true;
 }
 
@@ -83,111 +192,11 @@ QString AllySystemControl::readFromSysfs(const QString& path) {
         return QString();
     }
     
-    return QString::fromUtf8(file.readAll()).trimmed();
+    QString value = QString::fromUtf8(file.readAll()).trimmed();
+    file.close();
+    return value;
 }
 
-bool AllySystemControl::isVRRSupported() const {
-    return m_vrrSupported;
-}
-
-bool AllySystemControl::isVRREnabled() const {
-    return m_vrrEnabled;
-}
-
-bool AllySystemControl::setVRREnabled(bool enabled) {
-    if (!m_vrrSupported) return false;
-    
-    if (writeToSysfs(m_vrrSysfsPath, enabled ? "1" : "0")) {
-        m_vrrEnabled = enabled;
-        emit vrrStatusChanged(enabled);
-        return true;
-    }
-    return false;
-}
-
-int AllySystemControl::getCurrentRefreshRate() const {
-    return m_currentRefreshRate;
-}
-
-QList<int> AllySystemControl::getSupportedRefreshRates() const {
-    // ROG Ally supported refresh rates
-    return {60, 120};
-}
-
-bool AllySystemControl::setRefreshRate(int rate) {
-    if (!getSupportedRefreshRates().contains(rate)) {
-        return false;
-    }
-
-    // Set refresh rate using DRM interface
-    QString cmd = QString("xrandr --output eDP --rate %1").arg(rate);
-    if (system(cmd.toUtf8().constData()) == 0) {
-        m_currentRefreshRate = rate;
-        emit refreshRateChanged(rate);
-        return true;
-    }
-    return false;
-}
-
-AllySystemControl::PerformanceMode AllySystemControl::getCurrentMode() const {
-    return m_currentMode;
-}
-
-bool AllySystemControl::setPerformanceMode(PerformanceMode mode) {
-    QString value;
-    switch (mode) {
-        case PerformanceMode::SILENT:
-            value = "0";
-            break;
-        case PerformanceMode::BALANCED:
-            value = "1";
-            break;
-        case PerformanceMode::TURBO:
-            value = "2";
-            break;
-        case PerformanceMode::CUSTOM:
-            // Custom mode uses current TDP and fan settings
-            return true;
-    }
-    
-    if (writeToSysfs(m_perfModePath, value)) {
-        m_currentMode = mode;
-        emit performanceModeChanged(mode);
-        return true;
-    }
-    return false;
-}
-
-bool AllySystemControl::setCustomTDP(int watts) {
-    if (watts < 5 || watts > 30) { // Safe TDP range for ROG Ally
-        return false;
-    }
-    
-    if (writeToSysfs(m_tdpPath, QString::number(watts))) {
-        m_currentTDP = watts;
-        emit tdpChanged(watts);
-        return true;
-    }
-    return false;
-}
-
-bool AllySystemControl::setCustomFanSpeed(int percentage) {
-    if (percentage < 0 || percentage > 100) {
-        return false;
-    }
-    
-    if (writeToSysfs(m_fanPath, QString::number(percentage))) {
-        m_currentFanSpeed = percentage;
-        emit fanSpeedChanged(percentage);
-        return true;
-    }
-    return false;
-}
-
-int AllySystemControl::getCurrentTDP() const {
-    return m_currentTDP;
-}
-
-int AllySystemControl::getCurrentFanSpeed() const {
-    return m_currentFanSpeed;
+AllySystemControl::~AllySystemControl() {
+    m_monitorTimer.stop();
 }

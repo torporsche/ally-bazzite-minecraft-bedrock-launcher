@@ -2,44 +2,48 @@
 
 #include <QObject>
 #include <QString>
-#include <QProcess>
-#include <memory>
+#include <steam/steam_api.h>
+
+class GameOverlayActivated_t;
 
 class SteamIntegration : public QObject {
     Q_OBJECT
 
 public:
     static SteamIntegration* instance();
-
-    bool isSteamRunning() const;
-    bool isBigPictureMode() const;
-    bool isGameModeActive() const;
     
-    // Steam integration methods
-    bool launchInBigPicture(const QString& appId = QString());
-    bool addNonSteamGame(const QString& execPath, const QString& name);
-    bool removeNonSteamGame(const QString& appId);
-    QString getLastActiveUser() const;
+    bool initialize();
+    bool isSteamRunning() const { return m_steamRunning; }
+    bool isBigPictureMode() const { return m_bigPictureMode; }
+    bool isGameModeActive() const { return m_gameModeActive; }
+    bool isOverlayEnabled() const { return m_overlayEnabled; }
+    bool isCloudSyncEnabled() const { return m_cloudSyncEnabled; }
+
+    bool loadSteamInputConfig(const QString& configPath);
+    bool launchInBigPicture();
+    bool setupGamemodeEnvironment();
+    bool configureControllerLayout();
 
 signals:
     void steamStatusChanged(bool running);
-    void bigPictureModeChanged(bool active);
+    void bigPictureModeChanged(bool enabled);
     void gameModeChanged(bool active);
+    void overlayStatusChanged(bool enabled);
+    void cloudSyncStatusChanged(bool enabled);
+    void controllerConfigChanged();
 
 private:
     explicit SteamIntegration(QObject* parent = nullptr);
     ~SteamIntegration();
 
     static SteamIntegration* s_instance;
-    
+
+    void detectSteamInstallation();
+    void STEAM_CALLBACK(onGameOverlayActivated, GameOverlayActivated_t*);
+
     bool m_steamRunning;
     bool m_bigPictureMode;
     bool m_gameModeActive;
-    QString m_steamPath;
-    QString m_activeUser;
-    
-    void detectSteamInstallation();
-    void monitorSteamProcess();
-    void checkGameMode();
-    QString findSteamConfig() const;
+    bool m_overlayEnabled;
+    bool m_cloudSyncEnabled;
 };

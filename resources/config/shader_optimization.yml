@@ -1,0 +1,29 @@
+shader_cache:
+  enabled: true
+  path: "~/.local/share/minecraft/shader_cache"
+  max_size_mb: 1024
+  cleanup_interval: 7
+
+vulkan_layers:
+  VK_LAYER_MESA_overlay: true
+  VK_LAYER_VALVE_steam_fossilize: true
+  VK_LAYER_MESA_device_select: true
+
+graphics_presets:
+  battery_saver:
+    tdp: 10
+    gpu_freq: 1200
+    fps_limit: 30
+    resolution: "1280x800"
+    
+  balanced:
+    tdp: 15
+    gpu_freq: 1600
+    fps_limit: 60
+    resolution: "1920x1080"
+    
+  performance:
+    tdp: 25
+    gpu_freq: 2000
+    fps_limit: 90
+    resolution: "1920x1080"

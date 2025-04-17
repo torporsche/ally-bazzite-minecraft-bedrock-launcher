@@ -1,45 +1,47 @@
 #pragma once
 
 #include <QObject>
+#include <QTimer>
 #include <QString>
+#include <memory>
 
 class AllySystemControl : public QObject {
     Q_OBJECT
 
 public:
-    enum class PerformanceMode {
-        SILENT,
-        BALANCED,
-        TURBO,
-        CUSTOM
+    enum class PerformanceProfile {
+        SILENT,      // Optimized for battery life
+        BALANCED,    // Default profile
+        TURBO,       // Maximum performance
+        MANUAL       // Custom settings
     };
-    Q_ENUM(PerformanceMode)
+    Q_ENUM(PerformanceProfile)
 
     static AllySystemControl* instance();
 
-    // VRR Control
-    bool isVRRSupported() const;
-    bool isVRREnabled() const;
-    bool setVRREnabled(bool enabled);
-    int getCurrentRefreshRate() const;
-    QList<int> getSupportedRefreshRates() const;
-    bool setRefreshRate(int rate);
+    bool setPerformanceProfile(PerformanceProfile profile);
+    bool setTDP(int watts);  // Range: 5-30W
+    bool setGPUFreq(int mhz);
+    bool enableFreeSync(bool enabled);
+    bool setFanSpeed(int percentage);  // Range: 0-100
 
-    // Performance Profile Control
-    PerformanceMode getCurrentMode() const;
-    bool setPerformanceMode(PerformanceMode mode);
-    
-    // Custom Performance Settings
-    bool setCustomTDP(int watts);
-    bool setCustomFanSpeed(int percentage);
-    int getCurrentTDP() const;
-    int getCurrentFanSpeed() const;
+    // Getters
+    PerformanceProfile currentProfile() const;
+    int currentTDP() const;
+    int currentGPUFreq() const;
+    bool isFreeSyncEnabled() const;
+    float getCurrentTemperature() const;
+    int getBatteryLevel() const;
+    bool isCharging() const;
 
 signals:
-    void vrrStatusChanged(bool enabled);
-    void refreshRateChanged(int rate);
-    void performanceModeChanged(PerformanceMode mode);
+    void temperatureChanged(float temp);
+    void batteryLevelChanged(int level);
+    void chargingStateChanged(bool charging);
+    void performanceProfileChanged(PerformanceProfile profile);
     void tdpChanged(int watts);
+    void gpuFreqChanged(int mhz);
+    void freeSyncStatusChanged(bool enabled);
     void fanSpeedChanged(int percentage);
 
 private:
@@ -48,21 +50,30 @@ private:
 
     static AllySystemControl* s_instance;
 
-    bool m_vrrSupported;
-    bool m_vrrEnabled;
-    int m_currentRefreshRate;
-    PerformanceMode m_currentMode;
-    int m_currentTDP;
-    int m_currentFanSpeed;
-
+    // Hardware monitoring
+    QTimer m_monitorTimer;
+    void monitorTemperature();
+    void monitorBattery();
+    void adjustFanCurve();
+    
     // System file paths
-    QString m_vrrSysfsPath;
-    QString m_perfModePath;
-    QString m_tdpPath;
-    QString m_fanPath;
+    static const QString POWER_PROFILE_PATH;
+    static const QString TDP_PATH;
+    static const QString GPU_FREQ_PATH;
+    static const QString TEMP_PATH;
+    static const QString FAN_PATH;
+    static const QString BATTERY_PATH;
+    
+    // Current state
+    PerformanceProfile m_currentProfile;
+    int m_currentTDP;
+    int m_currentGPUFreq;
+    bool m_freeSyncEnabled;
+    float m_currentTemp;
+    int m_batteryLevel;
+    bool m_isCharging;
+    int m_fanSpeed;
 
-    bool initializeVRRControl();
-    bool initializePerformanceControl();
     bool writeToSysfs(const QString& path, const QString& value);
     QString readFromSysfs(const QString& path);
 };

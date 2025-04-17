@@ -1,0 +1,37 @@
+layouts:
+  default:
+    scaling: 1.0
+    touch_targets: "normal"
+    font_size: 12
+    icon_size: 32
+    spacing: 8
+
+  big_picture:
+    scaling: 1.5
+    touch_targets: "large"
+    font_size: 16
+    icon_size: 48
+    spacing: 16
+
+  touch:
+    scaling: 1.25
+    touch_targets: "large"
+    font_size: 14
+    icon_size: 40
+    spacing: 12
+
+components:
+  buttons:
+    min_size: [80, 32]
+    padding: [16, 8]
+    corner_radius: 4
+
+  lists:
+    item_height: 40
+    separator_height: 1
+    scrollbar_width: 8
+
+  tooltips:
+    show_delay_ms: 500
+    hide_delay_ms: 100
+    font_size: 11

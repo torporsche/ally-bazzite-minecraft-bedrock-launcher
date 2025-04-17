@@ -1,0 +1,39 @@
+app-id: com.github.torporsche.ally-mc-launcher
+runtime: org.kde.Platform
+runtime-version: '6.6'
+sdk: org.kde.Sdk
+command: ally-mc-launcher
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=x11
+  - --device=dri
+  - --device=all
+  - --filesystem=home
+  - --filesystem=/sys/class/powercap:ro
+  - --filesystem=/sys/class/hwmon:ro
+  - --filesystem=/sys/devices/platform/asus-nb-wmi:rw
+  - --talk-name=org.freedesktop.Steam
+  - --talk-name=org.freedesktop.portal.Desktop
+  - --env=STEAM_RUNTIME=1
+  - --env=SDL_VIDEODRIVER=wayland
+
+modules:
+  - name: SDL3
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: git
+        url: https://github.com/libsdl-org/SDL.git
+        tag: release-3.0.0
+
+  - name: ally-mc-launcher
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DINSTALL_DESKTOP_FILES=ON
+      - -DUSE_SYSTEM_SDL=ON
+    sources:
+      - type: dir
+        path: .

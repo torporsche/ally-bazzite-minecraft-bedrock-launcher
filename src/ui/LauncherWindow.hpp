@@ -1,12 +1,11 @@
 #pragma once
 
 #include <QMainWindow>
-#include <QStackedWidget>
-#include <QListWidget>
-#include <QPushButton>
-#include <QLabel>
-#include "../gamepad/AllyGamepad.hpp"
-#include "../steam/SteamIntegration.hpp"
+#include <QTouchEvent>
+#include <QGestureEvent>
+#include <QPinchGesture>
+#include <QSwipeGesture>
+#include <memory>
 
 class LauncherWindow : public QMainWindow {
     Q_OBJECT
@@ -16,43 +15,36 @@ public:
     ~LauncherWindow();
 
 protected:
-    bool eventFilter(QObject* obj, QEvent* event) override;
-    void showEvent(QShowEvent* event) override;
-    void closeEvent(QCloseEvent* event) override;
-
-private slots:
-    void onGamepadButton(AllyGamepad::Button button);
-    void onSteamStatusChanged(bool running);
-    void onBigPictureModeChanged(bool active);
-    void onGameModeChanged(bool active);
-    void onVersionSelected(QListWidgetItem* item);
-    void onInstallClicked();
-    void onPlayClicked();
-    void onSettingsClicked();
+    bool event(QEvent* event) override;
+    void touchEvent(QTouchEvent* event) override;
+    void gestureEvent(QGestureEvent* event) override;
 
 private:
-    void setupUI();
-    void setupGamepad();
+    void setupTouchSupport();
+    void handlePinchGesture(QPinchGesture* gesture);
+    void handleSwipeGesture(QSwipeGesture* gesture);
+    void setupBigPictureMode();
+    
+    // Touch and gesture handling
+    void processTouchBegin(const QTouchEvent* event);
+    void processTouchUpdate(const QTouchEvent* event);
+    void processTouchEnd(const QTouchEvent* event);
+    
+    // Big Picture Mode
+    bool m_bigPictureMode;
+    void toggleBigPictureMode(bool enabled);
     void updateUIScale();
-    void updateVersionList();
-    void updateControlHints();
-    void navigateList(int direction);
-    void toggleFullscreen();
     
-    // UI Elements
-    QStackedWidget* m_stackedWidget;
-    QListWidget* m_versionList;
-    QPushButton* m_playButton;
-    QPushButton* m_installButton;
-    QPushButton* m_settingsButton;
-    QLabel* m_controlHints;
+    // Touch state tracking
+    struct TouchPoint {
+        QPointF startPos;
+        QPointF lastPos;
+        qint64 startTime;
+    };
+    QMap<int, TouchPoint> m_touchPoints;
     
-    // State
-    bool m_isFullscreen;
-    int m_uiScale;
-    QString m_selectedVersion;
-    
-    // Steam integration
-    SteamIntegration* m_steam;
-    AllyGamepad* m_gamepad;
+    // Gesture recognition
+    bool m_gesturesEnabled;
+    float m_pinchScale;
+    float m_currentRotation;
 };

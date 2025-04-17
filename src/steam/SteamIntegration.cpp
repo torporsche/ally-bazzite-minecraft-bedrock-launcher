@@ -1,11 +1,6 @@
 #include "SteamIntegration.hpp"
+#include <QDebug>
 #include <QDir>
-#include <QFile>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QStandardPaths>
-#include <QTimer>
-#include <QProcess>
 #include <QSettings>
 
 SteamIntegration* SteamIntegration::s_instance = nullptr;
@@ -17,204 +12,113 @@ SteamIntegration* SteamIntegration::instance() {
     return s_instance;
 }
 
-SteamIntegration::SteamIntegration(QObject* parent)
+SteamIntegration::SteamIntegration(QObject* parent) 
     : QObject(parent)
     , m_steamRunning(false)
     , m_bigPictureMode(false)
-    , m_gameModeActive(false) {
-    
+    , m_gameModeActive(false)
+    , m_overlayEnabled(false)
+    , m_cloudSyncEnabled(false) {
     detectSteamInstallation();
-    monitorSteamProcess();
-    
-    // Check status periodically
-    QTimer* statusTimer = new QTimer(this);
-    connect(statusTimer, &QTimer::timeout, this, [this]() {
-        checkGameMode();
-    });
-    statusTimer->start(1000); // Check every second
 }
 
-SteamIntegration::~SteamIntegration() {
+bool SteamIntegration::initialize() {
+    if (m_steamRunning) {
+        return true;
+    }
+
+    if (!SteamAPI_Init()) {
+        qWarning() << "Failed to initialize Steam API";
+        return false;
+    }
+
+    m_steamRunning = true;
+    setupGamemodeEnvironment();
+    configureControllerLayout();
+    
+    // Register callback
+    m_callbackSteamOverlay = new STEAM_CALLBACK(
+        SteamIntegration, 
+        onGameOverlayActivated, 
+        GameOverlayActivated_t
+    );
+
+    emit steamStatusChanged(true);
+    return true;
+}
+
+bool SteamIntegration::setupGamemodeEnvironment() {
+    // Set required environment variables for Steam Gamemode
+    qputenv("SDL_VIDEODRIVER", "wayland");
+    qputenv("STEAM_RUNTIME_PREFER_HOST_LIBRARIES", "1");
+    qputenv("STEAM_GAMEPAD_CONFIG", "1");
+    qputenv("STEAM_USE_MANGOAPP", "1");
+    
+    // Enable FSR if available
+    qputenv("STEAM_GAMESCOPE_FSR", "1");
+    
+    return true;
+}
+
+bool SteamIntegration::configureControllerLayout() {
+    if (!m_steamRunning) {
+        return false;
+    }
+
+    // Initialize Steam Input
+    if (!SteamInput()->Init(true)) {
+        qWarning() << "Failed to initialize Steam Input";
+        return false;
+    }
+
+    // Load default controller config
+    const QString configPath = QDir(QCoreApplication::applicationDirPath())
+        .filePath("gamepad/ally_default.vdf");
+    
+    if (QFile::exists(configPath)) {
+        SteamInput()->LoadControllerConfig(configPath.toStdString().c_str());
+    }
+
+    return true;
+}
+
+bool SteamIntegration::loadSteamInputConfig(const QString& configPath) {
+    if (!m_steamRunning || !QFile::exists(configPath)) {
+        return false;
+    }
+
+    return SteamInput()->LoadControllerConfig(configPath.toStdString().c_str());
+}
+
+bool SteamIntegration::launchInBigPicture() {
+    if (!m_steamRunning) {
+        return false;
+    }
+
+    SteamAPI_RunCallbacks();
+    m_bigPictureMode = true;
+    emit bigPictureModeChanged(true);
+    return true;
+}
+
+void SteamIntegration::onGameOverlayActivated(GameOverlayActivated_t* callback) {
+    m_overlayEnabled = callback->m_bActive;
+    emit overlayStatusChanged(m_overlayEnabled);
 }
 
 void SteamIntegration::detectSteamInstallation() {
-    // Check common Steam installation paths for Bazzite OS
-    QStringList searchPaths = {
-        QDir::homePath() + "/.local/share/Steam",
-        QDir::homePath() + "/.steam/steam",
-        "/usr/share/steam"
-    };
-    
-    for (const QString& path : searchPaths) {
-        if (QFile::exists(path + "/steam")) {
-            m_steamPath = path;
-            break;
-        }
-    }
-    
-    if (m_steamPath.isEmpty()) {
-        qWarning() << "Steam installation not found";
-        return;
-    }
-    
-    // Get active user from Steam config
-    QString configPath = findSteamConfig();
-    if (!configPath.isEmpty()) {
-        QFile configFile(configPath);
-        if (configFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QString content = configFile.readAll();
-            QRegularExpression re("\"AutoLoginUser\"\\s+\"([^\"]+)\"");
-            QRegularExpressionMatch match = re.match(content);
-            if (match.hasMatch()) {
-                m_activeUser = match.captured(1);
-            }
-        }
-    }
+    // Check for Steam installation
+    #ifdef Q_OS_LINUX
+    QString steamPath = QDir::homePath() + "/.local/share/Steam";
+    #else
+    QString steamPath = "C:/Program Files (x86)/Steam";
+    #endif
+
+    m_steamRunning = QDir(steamPath).exists();
 }
 
-void SteamIntegration::monitorSteamProcess() {
-    QTimer* checkTimer = new QTimer(this);
-    connect(checkTimer, &QTimer::timeout, this, [this]() {
-        QProcess process;
-        process.start("pidof", {"steam"});
-        process.waitForFinished();
-        
-        bool running = (process.exitCode() == 0);
-        if (running != m_steamRunning) {
-            m_steamRunning = running;
-            emit steamStatusChanged(running);
-        }
-        
-        // Check Big Picture Mode
-        if (m_steamRunning) {
-            process.start("wmctrl", {"-l"});
-            process.waitForFinished();
-            QString output = process.readAll();
-            bool bpm = output.contains("Steam Big Picture Mode");
-            
-            if (bpm != m_bigPictureMode) {
-                m_bigPictureMode = bpm;
-                emit bigPictureModeChanged(bpm);
-            }
-        }
-    });
-    checkTimer->start(2000); // Check every 2 seconds
-}
-
-void SteamIntegration::checkGameMode() {
-    // Check if running in Steam GameMode
-    QProcess process;
-    process.start("ps", {"-A"});
-    process.waitForFinished();
-    QString output = process.readAll();
-    
-    bool gameMode = output.contains("gamescope") || 
-                    output.contains("steamos-session") ||
-                    QFile::exists("/run/gamescope");
-    
-    if (gameMode != m_gameModeActive) {
-        m_gameModeActive = gameMode;
-        emit gameModeChanged(gameMode);
+SteamIntegration::~SteamIntegration() {
+    if (m_steamRunning) {
+        SteamAPI_Shutdown();
     }
-}
-
-QString SteamIntegration::findSteamConfig() const {
-    QStringList configPaths = {
-        m_steamPath + "/config/loginusers.vdf",
-        QDir::homePath() + "/.steam/steam/config/loginusers.vdf"
-    };
-    
-    for (const QString& path : configPaths) {
-        if (QFile::exists(path)) {
-            return path;
-        }
-    }
-    
-    return QString();
-}
-
-bool SteamIntegration::isSteamRunning() const {
-    return m_steamRunning;
-}
-
-bool SteamIntegration::isBigPictureMode() const {
-    return m_bigPictureMode;
-}
-
-bool SteamIntegration::isGameModeActive() const {
-    return m_gameModeActive;
-}
-
-bool SteamIntegration::launchInBigPicture(const QString& appId) {
-    if (!m_steamRunning) {
-        QProcess::startDetached("steam", {"-bigpicture"});
-        return true;
-    }
-    
-    if (!appId.isEmpty()) {
-        QProcess::startDetached("steam", 
-            {"steam://rungameid/" + appId});
-        return true;
-    }
-    
-    return false;
-}
-
-bool SteamIntegration::addNonSteamGame(
-    const QString& execPath, 
-    const QString& name
-) {
-    if (!m_steamRunning || m_activeUser.isEmpty()) {
-        return false;
-    }
-    
-    // Find shortcuts.vdf
-    QString shortcutsPath = m_steamPath + "/userdata/" + 
-                           m_activeUser + "/config/shortcuts.vdf";
-    
-    // Create shortcuts file if it doesn't exist
-    if (!QFile::exists(shortcutsPath)) {
-        QFile file(shortcutsPath);
-        if (!file.open(QIODevice::WriteOnly)) {
-            return false;
-        }
-        file.close();
-    }
-    
-    // Add game to Steam
-    QProcess process;
-    process.start("steam", {
-        "-silent", 
-        "-addnonsteamgame", 
-        execPath,
-        "-name",
-        name
-    });
-    return process.waitForFinished();
-}
-
-bool SteamIntegration::removeNonSteamGame(const QString& appId) {
-    if (!m_steamRunning || m_activeUser.isEmpty()) {
-        return false;
-    }
-    
-    QString shortcutsPath = m_steamPath + "/userdata/" + 
-                           m_activeUser + "/config/shortcuts.vdf";
-    
-    if (!QFile::exists(shortcutsPath)) {
-        return false;
-    }
-    
-    // Remove game from Steam
-    QProcess process;
-    process.start("steam", {
-        "-silent", 
-        "-removenonsteamgame", 
-        appId
-    });
-    return process.waitForFinished();
-}
-
-QString SteamIntegration::getLastActiveUser() const {
-    return m_activeUser;
 }

@@ -1,0 +1,26 @@
+"controller_mappings"
+{
+    "version"       "3"
+    "revision"      "1"
+    "game_name"     "Minecraft Bedrock"
+    "title"         "ROG Ally Default"
+    "controller_type" "controller_xbox360"
+    
+    "group"
+    {
+        "name"      "game_actions"
+        "inputs"
+        {
+            "button_a"      "minecraft_jump"
+            "button_b"      "minecraft_sneak"
+            "button_x"      "minecraft_inventory"
+            "button_y"      "minecraft_drop"
+            "button_back"   "minecraft_pause"
+            "button_start"  "minecraft_menu"
+            "stick_left"    "minecraft_movement"
+            "stick_right"   "minecraft_camera"
+            "trigger_left"  "minecraft_break"
+            "trigger_right" "minecraft_place"
+        }
+    }
+}

@@ -1,0 +1,36 @@
+{
+    "controller": {
+        "deadzone": {
+            "left_stick": 0.15,
+            "right_stick": 0.15,
+            "triggers": 0.12
+        },
+        "sensitivity": {
+            "left_stick": 1.0,
+            "right_stick": 0.8,
+            "triggers": 1.0
+        },
+        "vibration": {
+            "enabled": true,
+            "strength": 0.8
+        }
+    },
+    "touchscreen": {
+        "enabled": true,
+        "sensitivity": 1.0,
+        "gestures": {
+            "pinch_zoom": true,
+            "two_finger_scroll": true,
+            "three_finger_swipe": true
+        }
+    },
+    "gyro": {
+        "enabled": true,
+        "sensitivity": 1.0,
+        "axis_mapping": {
+            "pitch": "X",
+            "yaw": "Y",
+            "roll": "Z"
+        }
+    }
+}

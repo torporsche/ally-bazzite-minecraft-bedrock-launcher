@@ -1,219 +1,70 @@
 #include "LauncherWindow.hpp"
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QScreen>
 #include <QApplication>
-#include <QStyle>
-#include <QStyleOption>
-#include <QPainter>
-#include <QSettings>
-#include <QMessageBox>
+#include <QScreen>
+#include <QTimer>
+#include <QtMath>
+#include <QPropertyAnimation>
 
 LauncherWindow::LauncherWindow(QWidget* parent)
     : QMainWindow(parent)
-    , m_isFullscreen(false)
-    , m_uiScale(100) {
+    , m_bigPictureMode(false)
+    , m_gesturesEnabled(true)
+    , m_pinchScale(1.0f)
+    , m_currentRotation(0.0f) {
     
-    setupUI();
-    setupGamepad();
+    setupTouchSupport();
+    setupBigPictureMode();
     
-    // Connect to Steam integration
-    m_steam = SteamIntegration::instance();
-    connect(m_steam, &SteamIntegration::steamStatusChanged,
-            this, &LauncherWindow::onSteamStatusChanged);
-    connect(m_steam, &SteamIntegration::bigPictureModeChanged,
-            this, &LauncherWindow::onBigPictureModeChanged);
-    connect(m_steam, &SteamIntegration::gameModeChanged,
-            this, &LauncherWindow::onGameModeChanged);
+    // Set window attributes for Steam Deck/ROG Ally
+    setWindowFlag(Qt::FramelessWindowHint);
+    setAttribute(Qt::WA_AcceptTouchEvents);
     
-    // Load settings
-    QSettings settings;
-    m_uiScale = settings.value("ui/scale", 100).toInt();
-    updateUIScale();
-    
-    // Install event filter for keyboard navigation
-    qApp->installEventFilter(this);
+    // Enable gesture support
+    grabGesture(Qt::PinchGesture);
+    grabGesture(Qt::SwipeGesture);
+    grabGesture(Qt::PanGesture);
 }
 
-LauncherWindow::~LauncherWindow() {
-    QSettings settings;
-    settings.setValue("ui/scale", m_uiScale);
-}
-
-void LauncherWindow::setupUI() {
-    // Set window properties
-    setWindowTitle("Minecraft Bedrock Launcher");
-    setMinimumSize(800, 600);
-    
-    // Create central widget
-    QWidget* centralWidget = new QWidget(this);
-    setCentralWidget(centralWidget);
-    
-    QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->setSpacing(20);
-    mainLayout->setContentsMargins(20, 20, 20, 20);
-    
-    // Create version list
-    m_versionList = new QListWidget(this);
-    m_versionList->setFocusPolicy(Qt::NoFocus);
-    m_versionList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_versionList->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_versionList->setStyleSheet(
-        "QListWidget {"
-        "   background-color: #2d2d2d;"
-        "   border-radius: 10px;"
-        "   padding: 10px;"
-        "}"
-        "QListWidget::item {"
-        "   height: 60px;"
-        "   color: white;"
-        "   background-color: #3d3d3d;"
-        "   border-radius: 5px;"
-        "   margin: 5px;"
-        "   padding: 10px;"
-        "}"
-        "QListWidget::item:selected {"
-        "   background-color: #5d5d5d;"
-        "}"
-    );
-    
-    connect(m_versionList, &QListWidget::itemClicked,
-            this, &LauncherWindow::onVersionSelected);
-    
-    mainLayout->addWidget(m_versionList, 1);
-    
-    // Create button container
-    QHBoxLayout* buttonLayout = new QHBoxLayout();
-    buttonLayout->setSpacing(10);
-    
-    // Create buttons
-    m_playButton = new QPushButton("Play", this);
-    m_installButton = new QPushButton("Install", this);
-    m_settingsButton = new QPushButton("Settings", this);
-    
-    QString buttonStyle = 
-        "QPushButton {"
-        "   background-color: #4d4d4d;"
-        "   color: white;"
-        "   border: none;"
-        "   border-radius: 5px;"
-        "   padding: 15px 30px;"
-        "   font-size: 16px;"
-        "}"
-        "QPushButton:hover {"
-        "   background-color: #5d5d5d;"
-        "}"
-        "QPushButton:pressed {"
-        "   background-color: #3d3d3d;"
-        "}";
-    
-    m_playButton->setStyleSheet(buttonStyle);
-    m_installButton->setStyleSheet(buttonStyle);
-    m_settingsButton->setStyleSheet(buttonStyle);
-    
-    connect(m_playButton, &QPushButton::clicked,
-            this, &LauncherWindow::onPlayClicked);
-    connect(m_installButton, &QPushButton::clicked,
-            this, &LauncherWindow::onInstallClicked);
-    connect(m_settingsButton, &QPushButton::clicked,
-            this, &LauncherWindow::onSettingsClicked);
-    
-    buttonLayout->addWidget(m_playButton);
-    buttonLayout->addWidget(m_installButton);
-    buttonLayout->addWidget(m_settingsButton);
-    
-    mainLayout->addLayout(buttonLayout);
-    
-    // Create control hints
-    m_controlHints = new QLabel(this);
-    m_controlHints->setStyleSheet(
-        "QLabel {"
-        "   color: #888888;"
-        "   font-size: 14px;"
-        "}"
-    );
-    updateControlHints();
-    
-    mainLayout->addWidget(m_controlHints);
-    
-    // Update version list
-    updateVersionList();
-}
-
-void LauncherWindow::setupGamepad() {
-    m_gamepad = AllyGamepad::instance();
-    connect(m_gamepad, &AllyGamepad::buttonPressed,
-            this, &LauncherWindow::onGamepadButton);
-}
-
-void LauncherWindow::updateUIScale() {
-    // Calculate base font size based on screen DPI and scale
-    int baseFontSize = (QApplication::desktop()->logicalDpiY() * m_uiScale) / 96;
-    
-    // Update font sizes
-    QFont font = QApplication::font();
-    font.setPointSize(baseFontSize);
-    QApplication::setFont(font);
-    
-    // Update control hints font size
-    QFont hintFont = m_controlHints->font();
-    hintFont.setPointSize(baseFontSize - 2);
-    m_controlHints->setFont(hintFont);
-    
-    // Update list item sizes
-    int itemHeight = baseFontSize * 3;
-    QString listStyle = m_versionList->styleSheet();
-    listStyle.replace(QRegExp("height:\\s*\\d+px"),
-                     QString("height: %1px").arg(itemHeight));
-    m_versionList->setStyleSheet(listStyle);
-}
-
-void LauncherWindow::updateControlHints() {
-    QString hints;
-    if (m_gamepad->isConnected()) {
-        hints = "A: Select   B: Back   Y: Settings   "
-               "↑↓: Navigate   L1/R1: Change Scale";
-    } else {
-        hints = "Enter: Select   Esc: Back   S: Settings   "
-               "↑↓: Navigate   +/-: Change Scale";
+void LauncherWindow::setupTouchSupport() {
+    QList<QScreen*> screens = QApplication::screens();
+    for (QScreen* screen : screens) {
+        if (screen->physicalDotsPerInch() > 150) {
+            // High DPI touch screen detected, adjust UI scaling
+            qreal scaling = screen->physicalDotsPerInch() / 96.0;
+            setProperty("scaling", scaling);
+        }
     }
-    m_controlHints->setText(hints);
 }
 
-void LauncherWindow::onGamepadButton(AllyGamepad::Button button) {
-    switch (button) {
-        case AllyGamepad::Button::A:
-            if (m_versionList->hasFocus()) {
-                onVersionSelected(m_versionList->currentItem());
-            }
+bool LauncherWindow::event(QEvent* event) {
+    switch (event->type()) {
+        case QEvent::TouchBegin:
+        case QEvent::TouchUpdate:
+        case QEvent::TouchEnd:
+            touchEvent(static_cast<QTouchEvent*>(event));
+            return true;
+            
+        case QEvent::Gesture:
+            gestureEvent(static_cast<QGestureEvent*>(event));
+            return true;
+            
+        default:
+            return QMainWindow::event(event);
+    }
+}
+
+void LauncherWindow::touchEvent(QTouchEvent* event) {
+    switch (event->type()) {
+        case QEvent::TouchBegin:
+            processTouchBegin(event);
             break;
             
-        case AllyGamepad::Button::B:
-            if (m_isFullscreen) {
-                toggleFullscreen();
-            }
+        case QEvent::TouchUpdate:
+            processTouchUpdate(event);
             break;
             
-        case AllyGamepad::Button::Y:
-            onSettingsClicked();
-            break;
-            
-        case AllyGamepad::Button::DPAD_UP:
-            navigateList(-1);
-            break;
-            
-        case AllyGamepad::Button::DPAD_DOWN:
-            navigateList(1);
-            break;
-            
-        case AllyGamepad::Button::L1:
-            m_uiScale = qMax(50, m_uiScale - 10);
-            updateUIScale();
-            break;
-            
-        case AllyGamepad::Button::R1:
-            m_uiScale = qMin(200, m_uiScale + 10);
-            updateUIScale();
+        case QEvent::TouchEnd:
+            processTouchEnd(event);
             break;
             
         default:
@@ -221,137 +72,124 @@ void LauncherWindow::onGamepadButton(AllyGamepad::Button button) {
     }
 }
 
-void LauncherWindow::navigateList(int direction) {
-    int row = m_versionList->currentRow();
-    int newRow = row + direction;
+void LauncherWindow::processTouchBegin(const QTouchEvent* event) {
+    const QList<QTouchEvent::TouchPoint> touchPoints = event->points();
     
-    if (newRow >= 0 && newRow < m_versionList->count()) {
-        m_versionList->setCurrentRow(newRow);
+    for (const QTouchEvent::TouchPoint& tp : touchPoints) {
+        TouchPoint point;
+        point.startPos = tp.position();
+        point.lastPos = tp.position();
+        point.startTime = QDateTime::currentMSecsSinceEpoch();
+        m_touchPoints.insert(tp.id(), point);
     }
 }
 
-void LauncherWindow::toggleFullscreen() {
-    if (m_isFullscreen) {
-        showNormal();
-    } else {
-        showFullScreen();
-    }
-    m_isFullscreen = !m_isFullscreen;
-}
-
-void LauncherWindow::onSteamStatusChanged(bool running) {
-    if (!running && m_steam->isGameModeActive()) {
-        // If Steam closes while in game mode, exit
-        QApplication::quit();
-    }
-}
-
-void LauncherWindow::onBigPictureModeChanged(bool active) {
-    if (active && !m_isFullscreen) {
-        toggleFullscreen();
-    }
-}
-
-void LauncherWindow::onGameModeChanged(bool active) {
-    if (active) {
-        // Ensure proper scaling in game mode
-        m_uiScale = 150; // Larger scale for TV mode
-        updateUIScale();
-        if (!m_isFullscreen) {
-            toggleFullscreen();
-        }
-    }
-}
-
-bool LauncherWindow::eventFilter(QObject* obj, QEvent* event) {
-    if (event->type() == QEvent::KeyPress) {
-        QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
-        switch (keyEvent->key()) {
-            case Qt::Key_Return:
-            case Qt::Key_Enter:
-                if (m_versionList->hasFocus()) {
-                    onVersionSelected(m_versionList->currentItem());
-                }
-                return true;
-                
-            case Qt::Key_Escape:
-                if (m_isFullscreen) {
-                    toggleFullscreen();
-                }
-                return true;
-                
-            case Qt::Key_S:
-                onSettingsClicked();
-                return true;
-                
-            case Qt::Key_Plus:
-                m_uiScale = qMin(200, m_uiScale + 10);
-                updateUIScale();
-                return true;
-                
-            case Qt::Key_Minus:
-                m_uiScale = qMax(50, m_uiScale - 10);
-                updateUIScale();
-                return true;
-        }
-    }
-    return QMainWindow::eventFilter(obj, event);
-}
-
-void LauncherWindow::showEvent(QShowEvent* event) {
-    QMainWindow::showEvent(event);
+void LauncherWindow::processTouchUpdate(const QTouchEvent* event) {
+    const QList<QTouchEvent::TouchPoint> touchPoints = event->points();
     
-    // Check if we should start in full screen
-    if (m_steam->isBigPictureMode() || m_steam->isGameModeActive()) {
-        toggleFullscreen();
-    }
-}
-
-void LauncherWindow::updateVersionList() {
-    m_versionList->clear();
-    
-    // Add installed versions
-    QList<InstalledVersion> versions = GameManager::instance()->getInstalledVersions();
-    for (const auto& version : versions) {
-        QListWidgetItem* item = new QListWidgetItem(m_versionList);
-        item->setText(version.versionInfo.versionString);
-        item->setData(Qt::UserRole, version.versionInfo.version.toString());
+    if (touchPoints.size() == 2) {
+        // Handle pinch/zoom
+        const QTouchEvent::TouchPoint& tp1 = touchPoints.at(0);
+        const QTouchEvent::TouchPoint& tp2 = touchPoints.at(1);
         
-        if (!version.isPlayable) {
-            item->setFlags(item->flags() & ~Qt::ItemIsEnabled);
+        QLineF line1(tp1.startPosition(), tp2.startPosition());
+        QLineF line2(tp1.position(), tp2.position());
+        
+        qreal scale = line2.length() / line1.length();
+        if (qAbs(scale - m_pinchScale) > 0.1) {
+            handlePinchGesture(nullptr);
         }
     }
 }
 
-void LauncherWindow::onVersionSelected(QListWidgetItem* item) {
-    if (!item) return;
+void LauncherWindow::processTouchEnd(const QTouchEvent* event) {
+    const QList<QTouchEvent::TouchPoint> touchPoints = event->points();
     
-    m_selectedVersion = item->data(Qt::UserRole).toString();
-    m_playButton->setEnabled(true);
-}
-
-void LauncherWindow::onPlayClicked() {
-    if (m_selectedVersion.isEmpty()) return;
-    
-    QVersionNumber version = QVersionNumber::fromString(m_selectedVersion);
-    
-    // Launch through Steam if in Big Picture Mode
-    if (m_steam->isBigPictureMode() || m_steam->isGameModeActive()) {
-        // Get the Steam App ID for the selected version
-        QString appId = "minecraft_" + m_selectedVersion;
-        m_steam->launchInBigPicture(appId);
-    } else {
-        // Launch directly
-        GameManager::instance()->launchVersion(version);
+    for (const QTouchEvent::TouchPoint& tp : touchPoints) {
+        if (m_touchPoints.contains(tp.id())) {
+            const TouchPoint& startPoint = m_touchPoints[tp.id()];
+            
+            // Calculate swipe
+            QPointF delta = tp.position() - startPoint.startPos;
+            qint64 duration = QDateTime::currentMSecsSinceEpoch() - startPoint.startTime;
+            
+            if (duration < 300) { // Short duration for swipe
+                if (qAbs(delta.x()) > 50 || qAbs(delta.y()) > 50) {
+                    // Handle swipe
+                    QSwipeGesture swipe;
+                    handleSwipeGesture(&swipe);
+                }
+            }
+            
+            m_touchPoints.remove(tp.id());
+        }
     }
 }
 
-void LauncherWindow::onInstallClicked() {
-    // Show available versions dialog
-    // Implementation will be added in the next part
+void LauncherWindow::handlePinchGesture(QPinchGesture* gesture) {
+    if (!m_gesturesEnabled) return;
+    
+    if (gesture) {
+        m_pinchScale *= gesture->scaleFactor();
+        
+        // Update UI scaling
+        updateUIScale();
+    }
 }
 
-void LauncherWindow::onSettingsClicked() {
-    // Show settings dialog
-    // Implementation will be added in the next part
+void LauncherWindow::handleSwipeGesture(QSwipeGesture* gesture) {
+    if (!m_gesturesEnabled) return;
+    
+    if (gesture) {
+        if (gesture->state() == Qt::GestureFinished) {
+            if (gesture->horizontalDirection() == QSwipeGesture::Left) {
+                // Handle left swipe
+                toggleBigPictureMode(!m_bigPictureMode);
+            }
+        }
+    }
+}
+
+void LauncherWindow::setupBigPictureMode() {
+    // Set up animations for transitions
+    QPropertyAnimation* scaleAnimation = new QPropertyAnimation(this, "windowOpacity");
+    scaleAnimation->setDuration(250);
+    scaleAnimation->setEasingCurve(QEasingCurve::InOutQuad);
+}
+
+void LauncherWindow::toggleBigPictureMode(bool enabled) {
+    m_bigPictureMode = enabled;
+    
+    if (enabled) {
+        // Switch to fullscreen optimized for controller/touch
+        showFullScreen();
+        setStyleSheet("QMainWindow { background-color: #1a1a1a; }");
+        
+        // Increase UI element sizes
+        updateUIScale();
+    } else {
+        showNormal();
+        setStyleSheet("");
+    }
+    
+    // Emit signal for other components to adjust
+    emit bigPictureModeChanged(enabled);
+}
+
+void LauncherWindow::updateUIScale() {
+    qreal scale = m_bigPictureMode ? 1.5 : 1.0;
+    scale *= m_pinchScale;
+    
+    // Update font sizes
+    QFont font = QApplication::font();
+    font.setPointSizeF(font.pointSizeF() * scale);
+    QApplication::setFont(font);
+    
+    // Update icon sizes
+    int iconSize = static_cast<int>(32 * scale);
+    setIconSize(QSize(iconSize, iconSize));
+}
+
+LauncherWindow::~LauncherWindow() {
+    // Cleanup
 }

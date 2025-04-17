@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: @PROJECT_NAME@
+Description: @PROJECT_DESCRIPTION@
+Version: @PROJECT_VERSION@
+Requires: Qt6Core Qt6Gui Qt6Widgets Qt6Network Qt6WebEngineWidgets Qt6Gamepad sdl3
+Libs: -L${libdir} -lally-mc-launcher
+Cflags: -I${includedir}/ally-mc-launcher

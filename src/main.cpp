@@ -1,37 +1,22 @@
 #include <QApplication>
-#include <QCommandLineParser>
-#include <QtWebEngineWidgets>
-#include <QGamepad>
-#include "LauncherWindow.hpp"
-#include "Config.hpp"
-#include "GooglePlayAuth.hpp"
+#include "ui/LauncherWindow.hpp"
+#include "core/Config.hpp"
+#include "steam/SteamIntegration.hpp"
 
 int main(int argc, char *argv[]) {
-    // Enable Wayland support
-    qputenv("QT_QPA_PLATFORM", "wayland");
-    
-    // Enable VRR if supported
-    qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
-    qputenv("ENABLE_VRR", "1");
-    
     QApplication app(argc, argv);
-    app.setApplicationName("Ally MC Launcher");
-    app.setOrganizationName("torporsche");
     
-    // Initialize WebEngine for Google Play authentication
-    QtWebEngineWidgets::initialize();
-    
-    // Parse command line arguments
-    QCommandLineParser parser;
-    parser.setApplicationDescription("Minecraft Bedrock Launcher for ROG Ally X");
-    parser.addHelpOption();
-    parser.addVersionOption();
-    parser.process(app);
+    app.setApplicationName("ally-mc-launcher");
+    app.setApplicationVersion(APP_VERSION);
     
     // Initialize configuration
-    Config::initialize();
+    Config::instance()->load("/etc/ally-mc-launcher/config/default_config.json");
     
-    // Create and show the main window
+    // Initialize Steam integration
+    if (!SteamIntegration::instance()->initialize()) {
+        qWarning() << "Failed to initialize Steam integration";
+    }
+    
     LauncherWindow window;
     window.show();
     
