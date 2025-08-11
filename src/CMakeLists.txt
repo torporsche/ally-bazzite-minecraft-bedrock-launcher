@@ -1,4 +1,6 @@
 add_executable(${PROJECT_NAME}
+    main.cpp
+    core/Config.cpp
     game/GameManager.cpp
     gamepad/AllySystemControl.cpp
     steam/SteamIntegration.cpp
