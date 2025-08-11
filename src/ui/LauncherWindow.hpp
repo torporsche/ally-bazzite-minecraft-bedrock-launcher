@@ -16,14 +16,18 @@ public:
 
 protected:
     bool event(QEvent* event) override;
-    void touchEvent(QTouchEvent* event) override;
-    void gestureEvent(QGestureEvent* event) override;
+
+signals:
+    void touchGestureDetected();
+    void bigPictureModeChanged(bool enabled);
 
 private:
     void setupTouchSupport();
     void handlePinchGesture(QPinchGesture* gesture);
     void handleSwipeGesture(QSwipeGesture* gesture);
     void setupBigPictureMode();
+    void touchEvent(QTouchEvent* event);
+    void gestureEvent(QGestureEvent* event);
     
     // Touch and gesture handling
     void processTouchBegin(const QTouchEvent* event);

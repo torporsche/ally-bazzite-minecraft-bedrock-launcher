@@ -2,9 +2,11 @@
 
 #include <QObject>
 #include <QString>
-#include <steam/steam_api.h>
 
+#ifdef STEAM_SUPPORT
+#include <steam/steam_api.h>
 class GameOverlayActivated_t;
+#endif
 
 class SteamIntegration : public QObject {
     Q_OBJECT
@@ -39,7 +41,10 @@ private:
     static SteamIntegration* s_instance;
 
     void detectSteamInstallation();
+    
+#ifdef STEAM_SUPPORT
     void STEAM_CALLBACK(onGameOverlayActivated, GameOverlayActivated_t*);
+#endif
 
     bool m_steamRunning;
     bool m_bigPictureMode;

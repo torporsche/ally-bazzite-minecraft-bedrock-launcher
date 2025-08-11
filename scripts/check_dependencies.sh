@@ -19,8 +19,7 @@ PACKAGES_TO_INSTALL=""
 REQUIRED_PACKAGES=(
     qt6-base-dev
     qt6-webengine-dev
-    qt6-gamepad-dev
-    libsdl3-dev
+    libsdl2-dev
     libwayland-dev
     libegl-dev
     libgl-dev
@@ -31,12 +30,15 @@ REQUIRED_PACKAGES=(
     ninja-build
     pkg-config
     vulkan-tools
-    gamescope
-    qt6-test-dev
     build-essential
     git
     wget
     unzip
+)
+
+# Optional packages (don't fail if missing)
+OPTIONAL_PACKAGES=(
+    gamescope
 )
 
 # Check each required package
@@ -52,6 +54,16 @@ if [ ! -z "$PACKAGES_TO_INSTALL" ]; then
 else
     echo "All required packages are already installed."
 fi
+
+# Check optional packages (don't fail if missing)
+echo "Checking optional packages..."
+for package in "${OPTIONAL_PACKAGES[@]}"; do
+    if ! dpkg -l "$package" >/dev/null 2>&1; then
+        echo "Optional package $package is not available or not installed."
+    else
+        echo "Optional package $package is installed."
+    fi
+done
 
 # Verify CMake version
 CMAKE_VERSION=$(cmake --version | head -n1 | cut -d" " -f3)

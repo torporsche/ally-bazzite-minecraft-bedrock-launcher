@@ -70,6 +70,18 @@ void LauncherWindow::touchEvent(QTouchEvent* event) {
         default:
             break;
     }
+    
+    emit touchGestureDetected();
+}
+
+void LauncherWindow::gestureEvent(QGestureEvent* event) {
+    if (QGesture* pinch = event->gesture(Qt::PinchGesture)) {
+        handlePinchGesture(static_cast<QPinchGesture*>(pinch));
+    }
+    
+    if (QGesture* swipe = event->gesture(Qt::SwipeGesture)) {
+        handleSwipeGesture(static_cast<QSwipeGesture*>(swipe));
+    }
 }
 
 void LauncherWindow::processTouchBegin(const QTouchEvent* event) {
@@ -92,7 +104,8 @@ void LauncherWindow::processTouchUpdate(const QTouchEvent* event) {
         const QTouchEvent::TouchPoint& tp1 = touchPoints.at(0);
         const QTouchEvent::TouchPoint& tp2 = touchPoints.at(1);
         
-        QLineF line1(tp1.startPosition(), tp2.startPosition());
+        // Use pressPosition() instead of startPosition() for Qt6
+        QLineF line1(tp1.pressPosition(), tp2.pressPosition());
         QLineF line2(tp1.position(), tp2.position());
         
         qreal scale = line2.length() / line1.length();

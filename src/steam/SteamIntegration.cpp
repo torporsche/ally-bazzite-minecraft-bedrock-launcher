@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QSettings>
+#include <QCoreApplication>
 
 SteamIntegration* SteamIntegration::s_instance = nullptr;
 
@@ -27,23 +28,21 @@ bool SteamIntegration::initialize() {
         return true;
     }
 
+#ifdef STEAM_SUPPORT
     if (!SteamAPI_Init()) {
         qWarning() << "Failed to initialize Steam API";
         return false;
     }
 
     m_steamRunning = true;
+    emit steamStatusChanged(true);
+#else
+    qDebug() << "Steam support not compiled in, using fallback mode";
+#endif
+
     setupGamemodeEnvironment();
     configureControllerLayout();
     
-    // Register callback
-    m_callbackSteamOverlay = new STEAM_CALLBACK(
-        SteamIntegration, 
-        onGameOverlayActivated, 
-        GameOverlayActivated_t
-    );
-
-    emit steamStatusChanged(true);
     return true;
 }
 
@@ -61,6 +60,7 @@ bool SteamIntegration::setupGamemodeEnvironment() {
 }
 
 bool SteamIntegration::configureControllerLayout() {
+#ifdef STEAM_SUPPORT
     if (!m_steamRunning) {
         return false;
     }
@@ -78,19 +78,29 @@ bool SteamIntegration::configureControllerLayout() {
     if (QFile::exists(configPath)) {
         SteamInput()->LoadControllerConfig(configPath.toStdString().c_str());
     }
+#else
+    qDebug() << "Steam support not available, using basic controller setup";
+#endif
 
     return true;
 }
 
 bool SteamIntegration::loadSteamInputConfig(const QString& configPath) {
+#ifdef STEAM_SUPPORT
     if (!m_steamRunning || !QFile::exists(configPath)) {
         return false;
     }
 
     return SteamInput()->LoadControllerConfig(configPath.toStdString().c_str());
+#else
+    Q_UNUSED(configPath)
+    qDebug() << "Steam support not available, cannot load controller config";
+    return false;
+#endif
 }
 
 bool SteamIntegration::launchInBigPicture() {
+#ifdef STEAM_SUPPORT
     if (!m_steamRunning) {
         return false;
     }
@@ -99,12 +109,18 @@ bool SteamIntegration::launchInBigPicture() {
     m_bigPictureMode = true;
     emit bigPictureModeChanged(true);
     return true;
+#else
+    qDebug() << "Steam support not available, cannot launch Big Picture mode";
+    return false;
+#endif
 }
 
+#ifdef STEAM_SUPPORT
 void SteamIntegration::onGameOverlayActivated(GameOverlayActivated_t* callback) {
     m_overlayEnabled = callback->m_bActive;
     emit overlayStatusChanged(m_overlayEnabled);
 }
+#endif
 
 void SteamIntegration::detectSteamInstallation() {
     // Check for Steam installation
@@ -118,7 +134,9 @@ void SteamIntegration::detectSteamInstallation() {
 }
 
 SteamIntegration::~SteamIntegration() {
+#ifdef STEAM_SUPPORT
     if (m_steamRunning) {
         SteamAPI_Shutdown();
     }
+#endif
 }

@@ -4,6 +4,8 @@
 #include <QProcess>
 #include <QSettings>
 #include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include "../gamepad/AllySystemControl.hpp"
 
 GameManager* GameManager::s_instance = nullptr;
