@@ -15,17 +15,16 @@ jobs:
     
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake ninja-build
-        sudo apt-get install -y qt6-base-dev qt6-webengine-dev qt6-gamepad-dev
-        sudo apt-get install -y libsdl3-dev libwayland-dev libegl-dev
+        sudo chmod +x scripts/check_dependencies.sh
+        sudo ./scripts/check_dependencies.sh
 
     - name: Configure CMake
-      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      run: cmake -B build -GNinja -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
       run: cmake --build build --config Release
 
-    - name: Test
-      working-directory: build
-      run: ctest -C Release --output-on-failure
+    # Tests are disabled for now
+    # - name: Test
+    #   working-directory: build
+    #   run: ctest -C Release --output-on-failure

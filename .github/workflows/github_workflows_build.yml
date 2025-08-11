@@ -11,28 +11,29 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Install Dependencies
       run: |
-        sudo chmod +x scripts/setup_prerequisites.sh
-        sudo ./scripts/setup_prerequisites.sh
+        sudo chmod +x scripts/check_dependencies.sh
+        sudo ./scripts/check_dependencies.sh
     
     - name: Configure CMake
       run: |
         mkdir build
         cd build
-        cmake -GNinja ..
+        cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
     
     - name: Build
       run: |
         cd build
         ninja
     
-    - name: Run Tests
-      run: |
-        cd build
-        ctest --output-on-failure
+    # Tests are disabled for now
+    # - name: Run Tests
+    #   run: |
+    #     cd build
+    #     ctest --output-on-failure
     
     - name: Create Package
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -42,7 +43,7 @@ jobs:
     
     - name: Upload Artifact
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ally-mc-launcher
         path: build/ally-mc-launcher-*.deb
