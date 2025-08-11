@@ -1,0 +1,63 @@
+# Build directories
+build/
+*.build
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Ninja build files
+build.ninja
+.ninja_deps
+.ninja_log
+
+# Compiled Object files
+*.o
+*.obj
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Libraries
+*.so
+*.dylib
+*.a
+*.lib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Qt
+*.qm
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Logs
+*.log
+
+# Test coverage
+*.gcov
+*.gcno
+*.gcda
+coverage/
+
+# Steam SDK (if downloaded locally)
+steamworks_sdk/
