@@ -29,6 +29,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::WebEngineWidgets
+    Qt6::Gamepad
     SDL2::SDL2
     OpenGL::GL
 )

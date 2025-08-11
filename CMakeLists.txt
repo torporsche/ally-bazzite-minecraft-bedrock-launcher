@@ -41,10 +41,11 @@ find_package(Qt6 REQUIRED COMPONENTS
     Widgets
     Network
     WebEngineWidgets
+    Gamepad
     Test
 )
 
-# SDL2 instead of SDL3 (SDL3 not available in Ubuntu 24.04)
+# SDL2 for cross-platform input and audio support
 find_package(SDL2 REQUIRED)
 find_package(Wayland REQUIRED Client)
 find_package(EGL REQUIRED)
@@ -148,5 +149,5 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY ${PROJECT_DESCRIPTION})
 set(CPACK_PACKAGE_VENDOR "torporsche")
 set(CPACK_PACKAGE_CONTACT "torporsche@github.com")
 set(CPACK_GENERATOR "DEB;RPM")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-base-dev, qt6-webengine-dev, qt6-qttest-dev, libsdl3-dev")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-base-dev, qt6-webengine-dev, qt6-gamepad-dev, qt6-qttest-dev, libsdl2-dev")
 include(CPack)

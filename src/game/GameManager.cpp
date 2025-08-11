@@ -6,6 +6,8 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QGamepad>
+#include <QGamepadManager>
 #include "../gamepad/AllySystemControl.hpp"
 
 GameManager* GameManager::s_instance = nullptr;
@@ -36,6 +38,7 @@ bool GameManager::applyROGAllyOptimizations() {
     setupVulkanLayers();
     configureGameScope();
     setupControllerHints();
+    setupGamepadMapping();
     optimizeShaderCache();
     
     // Set environment variables for optimal performance
@@ -130,6 +133,61 @@ void GameManager::optimizeShaderCache() {
     qputenv("MESA_GLSL_CACHE_DIR", cachePath.toUtf8());
     qputenv("__GL_SHADER_DISK_CACHE_PATH", cachePath.toUtf8());
     qputenv("__GL_SHADER_DISK_CACHE_SKIP_CLEANUP", "1");
+}
+
+bool GameManager::setupGamepadMapping() {
+    qDebug() << "Setting up gamepad mapping for ROG Ally...";
+    
+    // Initialize gamepad manager
+    auto* gamepadManager = QGamepadManager::instance();
+    auto connectedGamepads = gamepadManager->connectedGamepads();
+    
+    if (connectedGamepads.isEmpty()) {
+        qDebug() << "No gamepads detected";
+        return false;
+    }
+    
+    // Configure the first available gamepad (ROG Ally built-in controls)
+    int gamepadId = connectedGamepads.first();
+    QGamepad* gamepad = new QGamepad(gamepadId, this);
+    
+    // Enable gamepad
+    gamepad->setDeviceId(gamepadId);
+    
+    // Configure button mappings for Minecraft Bedrock
+    // These settings will be applied via environment variables for the game
+    QJsonObject mapping;
+    mapping["jump"] = "buttonA";
+    mapping["sneak"] = "buttonB"; 
+    mapping["inventory"] = "buttonY";
+    mapping["drop"] = "buttonX";
+    mapping["pause"] = "buttonStart";
+    mapping["chat"] = "buttonSelect";
+    mapping["move"] = "leftStick";
+    mapping["look"] = "rightStick";
+    mapping["attack"] = "buttonR2";
+    mapping["use"] = "buttonL2";
+    mapping["hotbar_left"] = "buttonL1";
+    mapping["hotbar_right"] = "buttonR1";
+    
+    // Save mapping to config file
+    QString configPath = QDir::homePath() + "/.local/share/minecraft/gamepad_mapping.json";
+    QDir().mkpath(QFileInfo(configPath).absolutePath());
+    
+    QFile configFile(configPath);
+    if (configFile.open(QIODevice::WriteOnly)) {
+        QJsonDocument doc(mapping);
+        configFile.write(doc.toJson());
+        configFile.close();
+        qDebug() << "Gamepad mapping saved to" << configPath;
+    }
+    
+    // Set environment variables for the game to pick up
+    qputenv("GAMEPAD_CONFIG_FILE", configPath.toUtf8());
+    qputenv("ENABLE_GAMEPAD", "1");
+    
+    qDebug() << "Gamepad mapping configured successfully for device" << gamepadId;
+    return true;
 }
 
 bool GameManager::enableFSR(bool enabled) {

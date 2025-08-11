@@ -2,7 +2,7 @@
 
 # Set error handling
 set -e
-echo "Checking and installing build dependencies for Ubuntu 24.04..."
+echo "Checking and installing build dependencies for Ubuntu 22.04..."
 
 # Function to check if a package is installed
 check_package() {
@@ -19,6 +19,7 @@ PACKAGES_TO_INSTALL=""
 REQUIRED_PACKAGES=(
     qt6-base-dev
     qt6-webengine-dev
+    qt6-gamepad-dev
     libsdl2-dev
     libwayland-dev
     libegl-dev
